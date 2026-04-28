@@ -4,35 +4,53 @@ import { OrderCard } from '../../../components/staff/OrderCard';
 import { KDSOrder } from '../../../types';
 import { getActiveOrders, updateOrderStatus } from '../../../lib/api';
 import { wsManager } from '../../../lib/websocket';
+import { useOrderStore } from '../../../store/orderStore';
 
 const KDSPage: React.FC = () => {
+  const storeOrders = useOrderStore(state => state.orders);
+  const updateStoreOrderStatus = useOrderStore(state => state.updateStatus);
   const [orders, setOrders] = useState<KDSOrder[]>([]);
   const [isConnected, setIsConnected] = useState(true);
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
-    loadActiveOrders();
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (storeOrders && storeOrders.length > 0) {
+      const activeOrders = storeOrders
+        .filter(o => o.fullOrder)
+        .map(o => ({
+          ...o.fullOrder,
+          id: o.id,
+          status: o.status,
+          elapsedSeconds: Math.floor((Date.now() - new Date(o.fullOrder?.createdAt || Date.now()).getTime()) / 1000)
+        }));
+      setOrders(activeOrders as KDSOrder[]);
+    } else {
+      loadActiveOrders();
+    }
+  }, [storeOrders]);
 
   const loadActiveOrders = async () => {
     try {
       const res = await getActiveOrders();
       setOrders(res.data);
     } catch (err) {
-      // Mock data for demo
+      // Mock data for demo standalone view
       setOrders([
         { 
-          id: 'o1', table_id: '12', status: 'pending', total: 600, elapsedSeconds: 120, createdAt: '',
+          id: 'o1', table_id: '12', status: 'pending', total: 600, elapsedSeconds: 120, createdAt: new Date().toISOString(),
           items: [{id: 'i1', item_id: 'm1', name: 'Manchow Soup', quantity: 2, price: 180, notes: 'Extra spicy please'}]
         },
         { 
-          id: 'o2', table_id: '04', status: 'preparing', total: 450, elapsedSeconds: 610, createdAt: '',
+          id: 'o2', table_id: '04', status: 'preparing', total: 450, elapsedSeconds: 610, createdAt: new Date().toISOString(),
           items: [{id: 'i2', item_id: 'm3', name: 'Chicken Clear Soup', quantity: 1, price: 210}]
         },
         { 
-          id: 'o3', table_id: '08', status: 'ready', total: 300, elapsedSeconds: 450, createdAt: '',
+          id: 'o3', table_id: '08', status: 'ready', total: 300, elapsedSeconds: 450, createdAt: new Date().toISOString(),
           items: [{id: 'i3', item_id: 'm5', name: 'Vegetable Grills', quantity: 1, price: 300}]
         }
       ]);
@@ -55,8 +73,10 @@ const KDSPage: React.FC = () => {
     try {
       await updateOrderStatus(orderId, nextStatus);
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o));
+      updateStoreOrderStatus(orderId, nextStatus);
     } catch (err) {
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o));
+      updateStoreOrderStatus(orderId, nextStatus);
     }
   };
 

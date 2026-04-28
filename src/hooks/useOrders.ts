@@ -42,7 +42,9 @@ export function usePlaceOrder() {
 }
 
 export function useOrderStatus(orderId: string | null) {
-  return useQuery<Order>({
+  const storeOrder = useOrderStore(state => state.orders?.find(o => o.id === orderId));
+  
+  const query = useQuery<Order>({
     queryKey: ['order', orderId],
     queryFn: async () => {
       if (!orderId) throw new Error('No order ID');
@@ -50,9 +52,9 @@ export function useOrderStatus(orderId: string | null) {
         const res = await getOrder(orderId);
         return res.data;
       } catch (err) {
-        const storeOrder = useOrderStore.getState().orders.find(o => o.id === orderId);
-        if (storeOrder?.fullOrder) {
-          return storeOrder.fullOrder;
+        const fallbackOrder = useOrderStore.getState().orders.find(o => o.id === orderId);
+        if (fallbackOrder?.fullOrder) {
+          return fallbackOrder.fullOrder;
         }
         return {
           ...MOCK_ORDER,
@@ -66,4 +68,22 @@ export function useOrderStatus(orderId: string | null) {
       return status === 'served' || status === 'cancelled' ? false : 5000;
     },
   });
+
+  if (storeOrder?.fullOrder && query.data) {
+    return {
+      ...query,
+      data: {
+        ...query.data,
+        ...storeOrder.fullOrder, // Mixin any immediate state
+      }
+    };
+  } else if (storeOrder?.fullOrder && !query.data) {
+    return {
+      ...query,
+      data: storeOrder.fullOrder,
+      isLoading: false
+    };
+  }
+
+  return query;
 }

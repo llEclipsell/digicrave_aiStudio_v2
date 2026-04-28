@@ -51,7 +51,7 @@ export const useOrderStore = create<OrderState>()(
       updateStatus: (id, status) => set((state) => {
         const currentOrders = state.orders || [];
         return {
-          orders: currentOrders.map(o => o.id === id ? { ...o, status } : o),
+          orders: currentOrders.map(o => o.id === id ? { ...o, status, fullOrder: o.fullOrder ? { ...o.fullOrder, status } : undefined } : o),
           orderStatus: state.orderId === id ? status : state.orderStatus
         };
       }),
@@ -59,7 +59,7 @@ export const useOrderStore = create<OrderState>()(
         const currentOrders = state.orders || [];
         return {
           orderStatus: status,
-          orders: state.orderId ? currentOrders.map(o => o.id === state.orderId ? { ...o, status } : o) : currentOrders
+          orders: state.orderId ? currentOrders.map(o => o.id === state.orderId ? { ...o, status, fullOrder: o.fullOrder ? { ...o.fullOrder, status } : undefined } : o) : currentOrders
         };
       }),
       setPayment: (id, details) => set({ paymentId: id, paymentDetails: details }),
@@ -70,3 +70,12 @@ export const useOrderStore = create<OrderState>()(
     }
   )
 );
+
+// Cross-tab synchronization
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'order-storage') {
+      useOrderStore.persist.rehydrate();
+    }
+  });
+}
